@@ -1,0 +1,5 @@
+{
+  "name": "Gerador de Perguntas Frequentes com IA",
+  "description": "Faça o upload da imagem de um produto para gerar automaticamente uma lista completa de 40 perguntas e respostas frequentes (FAQ), ideal para anúncios em marketplaces e e-commerce.",
+  "requestFramePermissions": []
+}
