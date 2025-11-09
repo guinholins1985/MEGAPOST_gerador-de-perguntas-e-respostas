@@ -5,7 +5,9 @@ import { generateFaqsFromImage } from './services/geminiService';
 import FaqList from './components/FaqList';
 import ImageUpload from './components/ImageUpload';
 import Loader from './components/Loader';
-import { LogoIcon } from './components/icons/LogoIcon';
+import { CopyIcon } from './components/icons/CopyIcon';
+import { DownloadIcon } from './components/icons/DownloadIcon';
+import { CheckIcon } from './components/icons/CheckIcon';
 
 const App: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -13,6 +15,7 @@ const App: React.FC = () => {
   const [faqs, setFaqs] = useState<FaqItemType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
 
   const handleImageChange = (file: File | null) => {
     setImageFile(file);
@@ -56,16 +59,48 @@ const App: React.FC = () => {
     }
   }, [imageFile, imagePreview]);
 
+  const formatFaqsForExport = useCallback(() => {
+    return faqs
+      .map(faq => `Pergunta: ${faq.question}\nResposta: ${faq.answer}`)
+      .join('\n\n');
+  }, [faqs]);
+
+  const handleCopyAll = useCallback(() => {
+    if (faqs.length === 0) return;
+
+    const formattedText = formatFaqsForExport();
+    navigator.clipboard.writeText(formattedText).then(() => {
+      setCopyStatus('copied');
+      setTimeout(() => setCopyStatus('idle'), 2500);
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+      setError('Falha ao copiar o texto. Tente novamente.');
+    });
+  }, [faqs, formatFaqsForExport]);
+
+  const handleDownloadTxt = useCallback(() => {
+    if (faqs.length === 0) return;
+
+    const formattedText = formatFaqsForExport();
+    const blob = new Blob([formattedText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'faq-gerado-ia.txt';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [faqs, formatFaqsForExport]);
+
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col items-center p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-4xl mx-auto">
         <header className="text-center mb-8">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <LogoIcon className="h-12 w-12 text-cyan-400" />
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
-              Gerador de FAQ IA
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500 mb-4">
+              Gerador de Perguntas Frequentes para E-commerce
             </h1>
-          </div>
           <p className="text-slate-400 max-w-2xl mx-auto">
             Faça o upload da imagem de um produto e nossa IA criará 40 perguntas e respostas frequentes, prontas para seu e-commerce.
           </p>
@@ -91,26 +126,60 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="relative min-h-[300px] md:min-h-full bg-slate-900 rounded-lg p-4 border border-slate-700">
-              <h2 className="text-2xl font-bold mb-4 text-slate-200">Resultado</h2>
-              {isLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 rounded-lg z-10">
-                  <Loader />
-                  <p className="mt-4 text-slate-300">Analisando a imagem e criando o FAQ...</p>
-                  <p className="text-sm text-slate-400">Isso pode levar alguns instantes.</p>
-                </div>
-              )}
-              {error && (
-                <div className="text-red-400 bg-red-900/50 p-4 rounded-lg border border-red-700">
-                  <strong>Erro:</strong> {error}
-                </div>
-              )}
-              {!isLoading && faqs.length > 0 && <FaqList faqs={faqs} />}
-              {!isLoading && !error && faqs.length === 0 && (
-                <div className="flex items-center justify-center h-full text-center text-slate-500">
-                  <p>As perguntas e respostas aparecerão aqui após a geração.</p>
-                </div>
-              )}
+            <div className="relative min-h-[300px] md:min-h-full bg-slate-900 rounded-lg p-4 border border-slate-700 flex flex-col">
+              <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                <h2 className="text-2xl font-bold text-slate-200">Resultado</h2>
+                {!isLoading && faqs.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopyAll}
+                      disabled={copyStatus === 'copied'}
+                      className="flex items-center gap-1.5 text-sm bg-slate-700 hover:bg-slate-600 disabled:bg-green-800/50 disabled:text-green-400 text-slate-300 font-semibold py-1.5 px-3 rounded-md transition-all duration-200"
+                      title="Copiar tudo"
+                    >
+                      {copyStatus === 'copied' ? (
+                        <>
+                          <CheckIcon className="h-4 w-4" />
+                          Copiado!
+                        </>
+                      ) : (
+                        <>
+                          <CopyIcon className="h-4 w-4" />
+                          Copiar
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleDownloadTxt}
+                      className="flex items-center gap-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-1.5 px-3 rounded-md transition-colors"
+                      title="Baixar como .txt"
+                    >
+                      <DownloadIcon className="h-4 w-4" />
+                      Baixar
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="flex-grow relative">
+                {isLoading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 rounded-lg z-10">
+                    <Loader />
+                    <p className="mt-4 text-slate-300">Analisando a imagem e criando o FAQ...</p>
+                    <p className="text-sm text-slate-400">Isso pode levar alguns instantes.</p>
+                  </div>
+                )}
+                {error && (
+                  <div className="text-red-400 bg-red-900/50 p-4 rounded-lg border border-red-700">
+                    <strong>Erro:</strong> {error}
+                  </div>
+                )}
+                {!isLoading && faqs.length > 0 && <FaqList faqs={faqs} />}
+                {!isLoading && !error && faqs.length === 0 && (
+                  <div className="flex items-center justify-center h-full text-center text-slate-500">
+                    <p>As perguntas e respostas aparecerão aqui após a geração.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </main>
